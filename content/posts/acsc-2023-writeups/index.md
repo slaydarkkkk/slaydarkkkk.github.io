@@ -1,5 +1,7 @@
 ---
 title: "ACSC 2023 re(pwn) writeup"
+date: 2023-02-28
+draft: false
 categories: 
   - writeups
 tags:
@@ -7,8 +9,7 @@ tags:
   - heap
   - tcache struct tampering
   - exit handler tampering
-date: 2023-02-28
-draft: false
+summary: "ACSC 2023 re(pwn) writeup"
 # featuredImage: 
 ---
 
