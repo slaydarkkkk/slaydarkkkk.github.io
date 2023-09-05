@@ -10,14 +10,10 @@ tags:
   - std::vector
   - std::unordered_map
 summary: "Downunderctf 2023 Writeups"
-# featuredImage: 
+featuredImage: "images/2023-09-03 18_59_11-DownUnderCTF 2023.png"
 ---
 
-![2023-09-03 18_59_11-DownUnderCTF 2023](images/2023-09-03 18_59_11-DownUnderCTF 2023.png)
-
-
-
-Celebrate independence day with DownunderCTF.
+Celebrate independence day with DownunderCTF. 
 
 Given files can be found at: 
 
