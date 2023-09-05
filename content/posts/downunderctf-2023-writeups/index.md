@@ -6,6 +6,9 @@ categories:
   - writeups
 tags:
   - pwn
+  - std::string
+  - std::vector
+  - std::unordered_map
 summary: "Downunderctf 2023 Writeups"
 # featuredImage: 
 ---
