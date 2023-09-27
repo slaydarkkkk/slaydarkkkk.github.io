@@ -571,7 +571,7 @@ p.interactive()
 
 # other challenges
 
-I could not solve durings the contest but since I sunk hours into them, I will give them honor mention. 
+I could not solve durings the contest but I will do them later. 
 
 ## binary mail
 
